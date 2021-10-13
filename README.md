@@ -26,6 +26,20 @@ timeout and can tolerate this excessively-long initial connection time.
 This test app attempts to reproduce the issue at a lower level to more easily
 faciliate debugging.
 
+### Instructions
+
+1. Clone this Git repository.
+1. Download the Firebase C++ SDK from https://firebase.google.com/docs/cpp/setup
+   (or from another location, as requested by me).
+1. Unzip the downloaded Firebase C++ SDK into the directory into which the Git
+   repository was cloned; this will create a subdirectory named
+   `firebase_cpp_sdk`.
+1. `cmake -S . -B build`
+1. `cd build`
+1. `cmake --build .`
+1. Copy your `google-services.json` into the `build` directory.
+1. `./firebase_unity_issue_1154_test_app`
+
 ### License
 
 Copyright 2021 Google LLC
