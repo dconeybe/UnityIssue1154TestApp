@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
+#include <cctype>
 #include <chrono>
 #include <condition_variable>
-#include <cctype>
 #include <ctime>
 #include <exception>
 #include <iomanip>
@@ -57,7 +57,7 @@ std::string FormattedTimestamp() {
   std::string formatted_timestamp(std::ctime(&ctime_timestamp));
   while (formatted_timestamp.size() > 0) {
     auto last_char = formatted_timestamp[formatted_timestamp.size() - 1];
-    if (! std::isspace(last_char)) {
+    if (!std::isspace(last_char)) {
       break;
     }
     formatted_timestamp.pop_back();
@@ -90,8 +90,11 @@ class AwaitableFutureCompletion {
 
   void AwaitInvoked() const {
     std::unique_lock<std::mutex> lock(mutex_);
-    condition_.wait(lock, [this](){return future_.status() != FutureStatus::kFutureStatusPending; });
+    condition_.wait(lock, [this]() {
+      return future_.status() != FutureStatus::kFutureStatusPending;
+    });
   }
+
  private:
   static void OnCompletion(const FutureBase&) {
     std::unique_lock<std::mutex> lock(mutex_);
@@ -108,12 +111,9 @@ std::condition_variable AwaitableFutureCompletion::condition_;
 
 class ArgParseException : public std::exception {
  public:
-  ArgParseException(const std::string& what) : what_(what) {
-  }
+  ArgParseException(const std::string& what) : what_(what) {}
 
-  const char* what() const noexcept override{
-    return what_.c_str();
-  }
+  const char* what() const noexcept override { return what_.c_str(); }
 
  private:
   const std::string what_;
@@ -134,7 +134,7 @@ ParsedArguments ParseArguments(int argc, char** argv) {
   bool next_is_key = false;
   bool next_is_value = false;
 
-  for (int i=1; i<argc; i++) {
+  for (int i = 1; i < argc; i++) {
     std::string arg(argv[i]);
     if (next_is_key) {
       args.key = arg;
@@ -157,8 +157,8 @@ ParsedArguments ParseArguments(int argc, char** argv) {
     } else if (arg == "--debug") {
       args.debug_logging_enabled = true;
     } else {
-      throw ArgParseException(std::string("invalid argument: ")
-        + arg + " (must be either \"read\" or \"write\")");
+      throw ArgParseException(std::string("invalid argument: ") + arg +
+                              " (must be either \"read\" or \"write\")");
     }
   }
 
@@ -167,8 +167,9 @@ ParsedArguments ParseArguments(int argc, char** argv) {
   } else if (next_is_value) {
     throw ArgParseException("Expected argument after --value");
   } else if (args.operations.size() == 0) {
-    throw ArgParseException("No arguments specified; "
-      "one or more of \"read\" or \"write\" is required");
+    throw ArgParseException(
+        "No arguments specified; "
+        "one or more of \"read\" or \"write\" is required");
   }
 
   return args;
@@ -233,7 +234,9 @@ void AwaitCompletion(FutureBase& future, const std::string& name) {
   }
 
   if (future.error() != Error::kErrorOk) {
-    Log(name, " FAILED in ", elapsed_time_str, ": ", FirestoreErrorNameFromErrorCode(future.error()), " ", future.error_message());
+    Log(name, " FAILED in ", elapsed_time_str, ": ",
+        FirestoreErrorNameFromErrorCode(future.error()), " ",
+        future.error_message());
   } else {
     Log(name, " done in ", elapsed_time_str);
   }
@@ -246,7 +249,8 @@ void DoRead(DocumentReference doc) {
   AwaitCompletion(future, "DocumentReference.Get()");
 
   const DocumentSnapshot* snapshot = future.result();
-  MapFieldValue data = snapshot->GetData(DocumentSnapshot::ServerTimestampBehavior::kDefault);
+  MapFieldValue data =
+      snapshot->GetData(DocumentSnapshot::ServerTimestampBehavior::kDefault);
   Log("Document num key/value pairs: ", data.size());
   int entry_index = 0;
   for (const std::pair<std::string, FieldValue>& entry : data) {
@@ -254,7 +258,8 @@ void DoRead(DocumentReference doc) {
   }
 }
 
-void DoWrite(DocumentReference doc, const std::string& key, const std::string& value) {
+void DoWrite(DocumentReference doc, const std::string& key,
+             const std::string& value) {
   Log("=======================================");
   Log("DoWrite() doc=", doc.path(), " setting ", key, "=", value);
   MapFieldValue map;
@@ -280,14 +285,15 @@ int main(int argc, char** argv) {
 
   Log("Creating firebase::App");
   std::unique_ptr<App> app(App::Create(AppOptions()));
-  if (! app) {
+  if (!app) {
     Log("ERROR: Creating firebase::App FAILED!");
     return 1;
   }
 
   Log("Creating firebase::firestore::Firestore");
-  std::unique_ptr<Firestore> firestore(Firestore::GetInstance(app.get(), nullptr));
-  if (! firestore) {
+  std::unique_ptr<Firestore> firestore(
+      Firestore::GetInstance(app.get(), nullptr));
+  if (!firestore) {
     Log("ERROR: Creating firebase::firestore::Firestore FAILED!");
     return 1;
   }
@@ -301,7 +307,8 @@ int main(int argc, char** argv) {
   }
 
   DocumentReference doc = firestore->Document("UnityIssue1154TestApp/TestDoc");
-  Log("Performing ", args.operations.size(), " operations on document: ", doc.path());
+  Log("Performing ", args.operations.size(),
+      " operations on document: ", doc.path());
   for (Operation operation : args.operations) {
     switch (operation) {
       case Operation::kRead: {
@@ -315,7 +322,8 @@ int main(int argc, char** argv) {
         break;
       }
       default: {
-        Log("INTERNAL ERROR: unknown value for operation: ", static_cast<int>(operation));
+        Log("INTERNAL ERROR: unknown value for operation: ",
+            static_cast<int>(operation));
         return 1;
       }
     }
