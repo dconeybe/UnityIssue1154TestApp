@@ -127,12 +127,14 @@ struct ParsedArguments {
   bool value_valid = false;
   bool use_emulator = false;
   bool debug_logging_enabled = false;
+  std::string help_text;
 };
 
 ParsedArguments ParseArguments(int argc, char** argv) {
   ParsedArguments args;
   bool next_is_key = false;
   bool next_is_value = false;
+  bool show_help = false;
 
   for (int i = 1; i < argc; i++) {
     std::string arg(argv[i]);
@@ -148,28 +150,65 @@ ParsedArguments ParseArguments(int argc, char** argv) {
       args.operations.push_back(Operation::kRead);
     } else if (arg == "write") {
       args.operations.push_back(Operation::kWrite);
-    } else if (arg == "--key") {
+    } else if (arg == "-k" || arg == "--key") {
       next_is_key = true;
-    } else if (arg == "--value") {
+    } else if (arg == "-v" || arg == "--value") {
       next_is_value = true;
-    } else if (arg == "--emulator") {
+    } else if (arg == "-e" || arg == "--emulator") {
       args.use_emulator = true;
-    } else if (arg == "--debug") {
+    } else if (arg == "-d" || arg == "--debug") {
       args.debug_logging_enabled = true;
+    } else if (arg == "-h" || arg == "--help") {
+      show_help = true;
     } else {
       throw ArgParseException(std::string("invalid argument: ") + arg +
-                              " (must be either \"read\" or \"write\")");
+                              " (run with --help for help)");
     }
   }
 
   if (next_is_key) {
-    throw ArgParseException("Expected argument after --key");
+    throw ArgParseException("expected argument after --key");
   } else if (next_is_value) {
-    throw ArgParseException("Expected argument after --value");
+    throw ArgParseException("expected argument after --value");
   } else if (args.operations.size() == 0) {
-    throw ArgParseException(
-        "No arguments specified; "
-        "one or more of \"read\" or \"write\" is required");
+    throw ArgParseException("no arguments specified; run with --help for help");
+  }
+
+  if (show_help) {
+    std::ostringstream ss;
+    ss << "Syntax: " << argv[0] << " [options] <read|write>..." << std::endl;
+    ss << std::endl;
+    ss << "The arguments \"read\" and \"write\" may be specified" << std::endl;
+    ss << "one or more times each, and each occurrence causes" << std::endl;
+    ss << "the application to perform a read or write operation" << std::endl;
+    ss << "from Firestore, respectively." << std::endl;
+    ss << std::endl;
+    ss << "The current directory *must* contain a" << std::endl;
+    ss << "google-services.json file." << std::endl;
+    ss << std::endl;
+    ss << "Options:" << std::endl;
+    ss << "  -h/--help" << std::endl;
+    ss << "    Print this help message and exit." << std::endl;
+    ss << "  -k/--key" << std::endl;
+    ss << "    Use this key when writing to Firestore." << std::endl;
+    ss << "  -v/--value" << std::endl;
+    ss << "    Use this value when writing to Firestore." << std::endl;
+    ss << "  -e/--emulator" << std::endl;
+    ss << "    Connection to the Firestore emulator." << std::endl;
+    ss << "  -d/--debug" << std::endl;
+    ss << "    Enable Firebase/Firestore debug logging." << std::endl;
+    ss << std::endl;
+    ss << "Examples:" << std::endl;
+    ss << std::endl;
+    ss << "Example 1: Perform a read followed by a write:" << std::endl;
+    ss << argv[0] << " read write" << std::endl;
+    ss << std::endl;
+    ss << "Example 2: Perform a write with custom key/value pair:" << std::endl;
+    ss << argv[0] << " -k city -v Dallas write" << std::endl;
+    ss << std::endl;
+    ss << "Example 3: Enable debug logging:" << std::endl;
+    ss << argv[0] << " --debug read write" << std::endl;
+    args.help_text = ss.str();
   }
 
   return args;
@@ -275,6 +314,11 @@ int main(int argc, char** argv) {
   } catch (ArgParseException& e) {
     Log("ERROR: Invalid command-line arguments: ", e.what());
     return 2;
+  }
+
+  if (args.help_text.size() > 0) {
+    std::cout << args.help_text;
+    return 0;
   }
 
   if (args.debug_logging_enabled) {
