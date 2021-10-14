@@ -39,6 +39,7 @@ using ::firebase::firestore::Error;
 using ::firebase::firestore::FieldValue;
 using ::firebase::firestore::Firestore;
 using ::firebase::firestore::MapFieldValue;
+using ::firebase::firestore::Settings;
 using ::firebase::firestore::Source;
 
 enum class Operation {
@@ -100,6 +101,7 @@ struct ParsedArguments {
   bool key_valid = false;
   std::string value;
   bool value_valid = false;
+  bool use_emulator = false;
 };
 
 ParsedArguments ParseArguments(int argc, char** argv) {
@@ -125,6 +127,8 @@ ParsedArguments ParseArguments(int argc, char** argv) {
       next_is_key = true;
     } else if (arg == "--value") {
       next_is_value = true;
+    } else if (arg == "--emulator") {
+      args.use_emulator = true;
     } else {
       throw ArgParseException(std::string("invalid argument: ")
         + arg + " (must be either \"read\" or \"write\")");
@@ -253,6 +257,14 @@ int main(int argc, char** argv) {
   if (! firestore) {
     Log("ERROR: Creating firebase::firestore::Firestore FAILED!");
     return 1;
+  }
+
+  if (args.use_emulator) {
+    Log("Using the Firestore Emulator");
+    Settings settings = firestore->settings();
+    settings.set_host("localhost:8080");
+    settings.set_ssl_enabled(false);
+    firestore->set_settings(settings);
   }
 
   DocumentReference doc = firestore->Document("UnityIssue1154TestApp/TestDoc");
