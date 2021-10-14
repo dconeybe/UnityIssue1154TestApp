@@ -33,7 +33,9 @@ using ::firebase::FutureStatus;
 using ::firebase::firestore::DocumentReference;
 using ::firebase::firestore::DocumentSnapshot;
 using ::firebase::firestore::Error;
+using ::firebase::firestore::FieldValue;
 using ::firebase::firestore::Firestore;
+using ::firebase::firestore::MapFieldValue;
 using ::firebase::firestore::Source;
 
 enum class Operation {
@@ -158,19 +160,34 @@ void AwaitCompletion(FutureBase& future, const std::string& name) {
   Log(name, " start");
   AwaitableFutureCompletion completion(future);
   completion.AwaitInvoked();
-  if (future.error() == Error::kErrorOk) {
-    Log(name, " done");
-  } else {
+
+  if (future.error() != Error::kErrorOk) {
     Log(name, " FAILED: ", FirestoreErrorNameFromErrorCode(future.error()), " ", future.error_message());
+  } else {
+    Log(name, " done");
   }
 }
 
 void DoRead(DocumentReference doc) {
+  Log("*** DoRead() doc=", doc.path());
   Future<DocumentSnapshot> future = doc.Get(Source::kServer);
   AwaitCompletion(future, "DocumentReference.Get()");
+
+  const DocumentSnapshot* snapshot = future.result();
+  MapFieldValue data = snapshot->GetData(DocumentSnapshot::ServerTimestampBehavior::kDefault);
+  Log("Document # key/value pairs: ", data.size());
+  int entry_index = 0;
+  for (const std::pair<std::string, FieldValue>& entry : data) {
+    Log("Entry #", ++entry_index, ": ", entry.first, "=", entry.second);
+  }
 }
 
 void DoWrite(DocumentReference doc) {
+  Log("*** DoWrite() doc=", doc.path());
+  MapFieldValue map;
+  map["meaning"] = FieldValue::Integer(42);
+  Future<void> future = doc.Set(map);
+  AwaitCompletion(future, "DocumentReference.Set()");
 }
 
 int main(int argc, char** argv) {
