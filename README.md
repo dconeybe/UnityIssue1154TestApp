@@ -38,7 +38,8 @@ faciliate debugging.
 1. `cd build`
 1. `cmake --build .`
 1. Copy your `google-services.json` into the `build` directory.
-1. `./firebase_unity_issue_1154_test_app`
+1. `./firebase_unity_issue_1154_test_app --help` or
+   `debug\firebase_unity_issue_1154_test_app.exe --help` on Windows.
 
 ### License
 
