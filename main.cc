@@ -91,28 +91,53 @@ class ArgParseException : public std::exception {
   const std::string what_;
 };
 
-std::vector<Operation> ParseOperations(int argc, char** argv) {
+struct ParsedArguments {
   std::vector<Operation> operations;
+  std::string key;
+  bool key_valid = false;
+  std::string value;
+  bool value_valid = false;
+};
+
+ParsedArguments ParseArguments(int argc, char** argv) {
+  ParsedArguments args;
+  bool next_is_key = false;
+  bool next_is_value = false;
+
   for (int i=1; i<argc; i++) {
-    std::string operation_name(argv[i]);
-    if (operation_name == "read") {
-      operations.push_back(Operation::kRead);
-    } else if (operation_name == "write") {
-      operations.push_back(Operation::kWrite);
+    std::string arg(argv[i]);
+    if (next_is_key) {
+      args.key = arg;
+      args.key_valid = true;
+      next_is_key = false;
+    } else if (next_is_value) {
+      args.value = arg;
+      args.value_valid = true;
+      next_is_value = false;
+    } else if (arg == "read") {
+      args.operations.push_back(Operation::kRead);
+    } else if (arg == "write") {
+      args.operations.push_back(Operation::kWrite);
+    } else if (arg == "--key") {
+      next_is_key = true;
+    } else if (arg == "--value") {
+      next_is_value = true;
     } else {
       throw ArgParseException(std::string("invalid argument: ")
-        + operation_name
-        + " (must be either \"read\" or \"write\")"
-      );
+        + arg + " (must be either \"read\" or \"write\")");
     }
   }
 
-  if (operations.size() == 0) {
+  if (next_is_key) {
+    throw ArgParseException("Expected argument after --key");
+  } else if (next_is_value) {
+    throw ArgParseException("Expected argument after --value");
+  } else if (args.operations.size() == 0) {
     throw ArgParseException("No arguments specified; "
       "one or more of \"read\" or \"write\" is required");
   }
 
-  return operations;
+  return args;
 }
 
 std::string FirestoreErrorNameFromErrorCode(int error) {
@@ -169,31 +194,33 @@ void AwaitCompletion(FutureBase& future, const std::string& name) {
 }
 
 void DoRead(DocumentReference doc) {
-  Log("*** DoRead() doc=", doc.path());
+  Log("=======================================");
+  Log("DoRead() doc=", doc.path());
   Future<DocumentSnapshot> future = doc.Get(Source::kServer);
   AwaitCompletion(future, "DocumentReference.Get()");
 
   const DocumentSnapshot* snapshot = future.result();
   MapFieldValue data = snapshot->GetData(DocumentSnapshot::ServerTimestampBehavior::kDefault);
-  Log("Document # key/value pairs: ", data.size());
+  Log("Document num key/value pairs: ", data.size());
   int entry_index = 0;
   for (const std::pair<std::string, FieldValue>& entry : data) {
     Log("Entry #", ++entry_index, ": ", entry.first, "=", entry.second);
   }
 }
 
-void DoWrite(DocumentReference doc) {
-  Log("*** DoWrite() doc=", doc.path());
+void DoWrite(DocumentReference doc, const std::string& key, const std::string& value) {
+  Log("=======================================");
+  Log("DoWrite() doc=", doc.path(), " setting ", key, "=", value);
   MapFieldValue map;
-  map["meaning"] = FieldValue::Integer(42);
+  map[key] = FieldValue::String(value);
   Future<void> future = doc.Set(map);
   AwaitCompletion(future, "DocumentReference.Set()");
 }
 
 int main(int argc, char** argv) {
-  std::vector<Operation> operations;
+  ParsedArguments args;
   try {
-    operations = ParseOperations(argc, argv);
+    args = ParseArguments(argc, argv);
   } catch (ArgParseException& e) {
     Log("ERROR: Invalid command-line arguments: ", e.what());
     return 2;
@@ -214,18 +241,23 @@ int main(int argc, char** argv) {
   }
 
   DocumentReference doc = firestore->Document("UnityIssue1154TestApp/TestDoc");
-  Log("Performing ", operations.size(), " operations on document: ", doc.path());
-  for (Operation operation : operations) {
+  Log("Performing ", args.operations.size(), " operations on document: ", doc.path());
+  for (Operation operation : args.operations) {
     switch (operation) {
-      case Operation::kRead:
+      case Operation::kRead: {
         DoRead(doc);
         break;
-      case Operation::kWrite:
-        DoWrite(doc);
+      }
+      case Operation::kWrite: {
+        std::string key = args.key_valid ? args.key : "TestKey";
+        std::string value = args.value_valid ? args.value : "TestValue";
+        DoWrite(doc, key, value);
         break;
-      default:
+      }
+      default: {
         Log("INTERNAL ERROR: unknown value for operation: ", static_cast<int>(operation));
         return 1;
+      }
     }
   }
 
