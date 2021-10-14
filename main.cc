@@ -14,11 +14,14 @@
  * limitations under the License.
  */
 
+#include <chrono>
 #include <condition_variable>
 #include <exception>
+#include <iomanip>
 #include <iostream>
 #include <memory>
 #include <mutex>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -183,13 +186,25 @@ std::string FirestoreErrorNameFromErrorCode(int error) {
 
 void AwaitCompletion(FutureBase& future, const std::string& name) {
   Log(name, " start");
+  auto start = std::chrono::steady_clock::now();
   AwaitableFutureCompletion completion(future);
   completion.AwaitInvoked();
+  auto end = std::chrono::steady_clock::now();
+  std::chrono::duration<double> elapsed_seconds = end - start;
+
+  std::string elapsed_time_str;
+  {
+    std::ostringstream ss;
+    ss << std::fixed;
+    ss << std::setprecision(2);
+    ss << elapsed_seconds.count() << "s";
+    elapsed_time_str = ss.str();
+  }
 
   if (future.error() != Error::kErrorOk) {
-    Log(name, " FAILED: ", FirestoreErrorNameFromErrorCode(future.error()), " ", future.error_message());
+    Log(name, " FAILED in ", elapsed_time_str, ": ", FirestoreErrorNameFromErrorCode(future.error()), " ", future.error_message());
   } else {
-    Log(name, " done");
+    Log(name, " done in ", elapsed_time_str);
   }
 }
 
