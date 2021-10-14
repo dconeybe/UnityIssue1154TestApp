@@ -16,6 +16,8 @@
 
 #include <chrono>
 #include <condition_variable>
+#include <cctype>
+#include <ctime>
 #include <exception>
 #include <iomanip>
 #include <iostream>
@@ -33,6 +35,8 @@ using ::firebase::AppOptions;
 using ::firebase::Future;
 using ::firebase::FutureBase;
 using ::firebase::FutureStatus;
+using ::firebase::LogLevel;
+using ::firebase::SetLogLevel;
 using ::firebase::firestore::DocumentReference;
 using ::firebase::firestore::DocumentSnapshot;
 using ::firebase::firestore::Error;
@@ -47,15 +51,35 @@ enum class Operation {
   kWrite,
 };
 
+std::string FormattedTimestamp() {
+  auto timestamp = std::chrono::system_clock::now();
+  std::time_t ctime_timestamp = std::chrono::system_clock::to_time_t(timestamp);
+  std::string formatted_timestamp(std::ctime(&ctime_timestamp));
+  while (formatted_timestamp.size() > 0) {
+    auto last_char = formatted_timestamp[formatted_timestamp.size() - 1];
+    if (! std::isspace(last_char)) {
+      break;
+    }
+    formatted_timestamp.pop_back();
+  }
+  return formatted_timestamp;
+}
+
 template <typename T>
-void Log(T message) {
+void Log0(T message) {
   std::cout << message << std::endl;
 }
 
 template <typename T, typename... U>
-void Log(T message, U... rest) {
+void Log0(T message, U... rest) {
   std::cout << message;
-  Log(rest...);
+  Log0(rest...);
+}
+
+template <typename... T>
+void Log(T... messages) {
+  std::cout << ">>>>> " << FormattedTimestamp() << " -- ";
+  Log0(messages...);
 }
 
 class AwaitableFutureCompletion {
@@ -102,6 +126,7 @@ struct ParsedArguments {
   std::string value;
   bool value_valid = false;
   bool use_emulator = false;
+  bool debug_logging_enabled = false;
 };
 
 ParsedArguments ParseArguments(int argc, char** argv) {
@@ -129,6 +154,8 @@ ParsedArguments ParseArguments(int argc, char** argv) {
       next_is_value = true;
     } else if (arg == "--emulator") {
       args.use_emulator = true;
+    } else if (arg == "--debug") {
+      args.debug_logging_enabled = true;
     } else {
       throw ArgParseException(std::string("invalid argument: ")
         + arg + " (must be either \"read\" or \"write\")");
@@ -243,6 +270,12 @@ int main(int argc, char** argv) {
   } catch (ArgParseException& e) {
     Log("ERROR: Invalid command-line arguments: ", e.what());
     return 2;
+  }
+
+  if (args.debug_logging_enabled) {
+    Log("Enabling debug logging");
+    SetLogLevel(LogLevel::kLogLevelDebug);
+    Firestore::set_log_level(LogLevel::kLogLevelDebug);
   }
 
   Log("Creating firebase::App");
