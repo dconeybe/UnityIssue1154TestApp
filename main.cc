@@ -170,7 +170,7 @@ ParsedArguments ParseArguments(int argc, char** argv) {
     throw ArgParseException("expected argument after --key");
   } else if (next_is_value) {
     throw ArgParseException("expected argument after --value");
-  } else if (args.operations.size() == 0) {
+  } else if (args.operations.size() == 0 && !show_help) {
     throw ArgParseException("no arguments specified; run with --help for help");
   }
 
